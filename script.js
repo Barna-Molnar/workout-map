@@ -1,29 +1,22 @@
 'use strict';
-
-
-
-
 class Workout {
     date = new Date();
     id = (Date.now() + '').slice(-10);
     constructor(coords, distance, duration) {
-
         this.coords = coords ///  [lat, lng]
         this.distance = distance // km 
-        this.duration = duration // in min    
-
+        this.duration = duration // in min   
+        this.clicks = 0;
     }
-
     _setDescription() {
-
         // prettier-ignore
         const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
         this.description = `${this.type[0].toUpperCase()}${this.type.slice(1)} on ${months[this.date.getMonth()]} ${this.date.getDate()}`
     }
-
+    click() {
+        this.clicks++
+    }
 }
-
 class Running extends Workout {
     constructor(coords, distance, duration, cadence) {
         super(coords, distance, duration)
@@ -32,7 +25,6 @@ class Running extends Workout {
         this.calcPace();
         this._setDescription();
     }
-
     calcPace() {
         // min/km
         this.pace = this.duration / this.distance
@@ -47,14 +39,11 @@ class Cycling extends Workout {
         this.calcSpeed();
         this._setDescription();
     }
-
     calcSpeed() {
         this.speed = this.distance / (this.duration / 60)
         return this.speed
     }
 }
-
-
 //////////////////////////////////
 // APPLICATION ARCHITECTURE
 
@@ -70,9 +59,11 @@ class App {
         this.map = map;
         this.mapEvent = mapEvent;
         this.workouts = [];
+
         this._getPosition();
         form.addEventListener("submit", this._newWorkout.bind(this));
-        inputType.addEventListener('change', this._toggleElevationField)
+        inputType.addEventListener('change', this._toggleElevationField);
+        containerWorkouts.addEventListener('click', this._moveToPopup.bind(this))
 
     }
     _getPosition() {
@@ -120,11 +111,7 @@ class App {
     _newWorkout(e) {
         // Helpers
         const validInput = (...inputs) => inputs.every(inp => Number.isFinite(inp))
-
-        const allPositive = (...inputs) => inputs.every(inp => inp > 0);
-
-
-
+        const allPositive = (...inputs) => inputs.every(inp => inp >= 0);
         e.preventDefault();
 
         // Get date  from form
@@ -135,12 +122,11 @@ class App {
         let workout;
 
 
-
-        // Check if darta us valid
+        // Check if data us valid
 
         // If workout running, create running object
         if (type === "running") {
-            const cadence = +inputCadence.value
+            let cadence = +inputCadence.value
             console.log(distance, duration, cadence)
                 // Check if the data is valid 
             if (
@@ -150,23 +136,20 @@ class App {
                 !validInput(distance, duration, cadence) || !allPositive(distance, duration, cadence)) {
                 return alert("Inputs have to be positiv numbers!")
             };
-            // Add new Object to workout array
+
+            // Creating workout
             workout = new Running([lat, lng], distance, duration, cadence)
-
-
         };
 
         // If workout cycling, create cycling object
         if (type === "cycling") {
-            const elevation = +inputElevation.value
+            let elevation = +inputElevation.value
             console.log(distance, duration, elevation)
             if (!validInput(distance, duration, elevation) || !allPositive(distance, duration, elevation)) {
                 return alert("Inputs have to be positiv numbers!")
             };
-
-
+            // Creating workout
             workout = new Cycling([lat, lng], distance, duration, elevation)
-
         }
 
         // Add new Object to workout array
@@ -179,13 +162,10 @@ class App {
         // Render workout on list 
         this._renderWorkout(workout)
 
-
-
         // Hide the form and clear the input fields 
         this._hideForm()
 
     }
-
     _renderWorkoutMarker(workout) {
         L.marker(workout.coords)
             .addTo(this.map)
@@ -201,7 +181,7 @@ class App {
     }
     _renderWorkout(workout) {
         let html = `
-        <li class="workout workout--${workout.type}" data-id="1234567890">
+        <li class="workout workout--${workout.type}" data-id=${workout.id}>
             <h2 class="workout__title">${workout.description}</h2>
             <div class="workout__details">
                 <span class="workout__icon">
@@ -246,6 +226,23 @@ class App {
                 `;
         form.insertAdjacentHTML("afterend", html);
 
+    }
+    _moveToPopup(e) {
+        const workoutEL = e.target.closest('.workout');
+        console.log(workoutEL)
+
+        if (!workoutEL) return;
+
+        const workout = this.workouts.find(work => work.id === workoutEL.dataset.id)
+        console.log(workout)
+
+        this.map.setView(workout.coords, 10, {
+            aniamate: true,
+            pan: {
+                duration: 1
+            }
+        });
+        workout.click()
     }
 }
 
